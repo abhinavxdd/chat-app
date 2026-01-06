@@ -60,7 +60,7 @@ export const useChatStore = create<ChatStore>((set) => ({
     set((state) => {
       const existing = state.typingUsers.find((u) => u.username === username);
       if (existing) {
-        return {
+        return { // update the status of user if it exists
           typingUsers: state.typingUsers.map((u) =>
             u.username === username ? { username, isTyping } : u
           ),
