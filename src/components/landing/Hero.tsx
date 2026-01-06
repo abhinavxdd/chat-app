@@ -24,9 +24,12 @@ export default function Hero() {
         >
           Start Chatting
         </Link>
-        <button className="px-8 py-4 bg-transparent border-2 border-red-600 text-red-600 rounded-full font-semibold text-lg hover:bg-red-600 hover:text-white transition-colors">
+        <Link
+          href="/learn-more"
+          className="px-8 py-4 bg-transparent border-2 border-red-600 text-red-600 rounded-full font-semibold text-lg hover:bg-red-600 hover:text-white transition-colors"
+        >
           Learn More
-        </button>
+        </Link>
       </div>
     </div>
   );
