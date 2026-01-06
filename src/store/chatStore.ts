@@ -25,7 +25,7 @@ interface ChatStore {
   users: User[];
   typingUsers: TypingUser[];
   addMessage: (message: Message) => void;
-  setRoom: (roomId: string) => void;
+  setRoom: (roomId: string | null) => void;
   addUser: (user: User) => void;
   removeUser: (userId: string) => void;
   setTyping: (username: string, isTyping: boolean) => void;
