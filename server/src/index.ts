@@ -60,19 +60,12 @@ io.on("connection", (socket) => {
     console.log(`${username} joined room ${roomId}`);
   });
 
-  socket.on(
-    "send-message",
-    ({ roomId, message, userId, username, timestamp }) => {
-      io.to(roomId).emit("receive-message", {
-        roomId,
-        message,
-        userId,
-        username,
-        timestamp,
-      });
-      console.log(`${username} sent message to ${roomId}: ${message}`);
-    }
-  );
+  socket.on("send-message", (message: Message) => {
+    io.to(message.roomId).emit("receive-message", message);
+    console.log(
+      `${message.username} sent message to ${message.roomId}: ${message.content}`
+    );
+  });
 
   socket.on("typing", ({ roomId, username, isTyping }) => {
     socket.to(roomId).emit("user-typing", { roomId, username, isTyping });
