@@ -67,8 +67,6 @@ io.on("connection", (socket) => {
     userData.username = username;
     userData.rooms.add(roomId);
 
-    socket.to(roomId).emit("user-joined", { userId, username, roomId });
-
     //Subscribing to redis channel
     const channel = `room:${roomId}`;
     if (!subscribedChannels.has(channel)) {
@@ -90,8 +88,6 @@ io.on("connection", (socket) => {
   });
 
   socket.on("send-message", (message: Message) => {
-    io.to(message.roomId).emit("receive-message", message);
-
     const channel = `room:${message.roomId}`;
     publisher.publish(
       channel,
@@ -107,7 +103,6 @@ io.on("connection", (socket) => {
   });
 
   socket.on("typing", ({ roomId, username, isTyping }) => {
-    socket.to(roomId).emit("user-typing", { roomId, username, isTyping });
     const channel = `room:${roomId}`;
     publisher.publish(
       channel,
@@ -120,7 +115,6 @@ io.on("connection", (socket) => {
   });
 
   socket.on("leave-room", ({ roomId, userId }) => {
-    socket.to(roomId).emit("user-left", { roomId, userId });
     socket.leave(roomId);
 
     // Remove room from tracked rooms
@@ -142,11 +136,6 @@ io.on("connection", (socket) => {
   socket.on("disconnect", () => {
     // Notify all rooms this user was in
     userData.rooms.forEach((roomId) => {
-      socket.to(roomId).emit("user-disconnected", {
-        userId: userData.userId,
-        username: userData.username,
-        roomId,
-      });
       const channel = `room:${roomId}`;
       publisher.publish(
         channel,
