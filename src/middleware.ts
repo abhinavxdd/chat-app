@@ -1,19 +1,17 @@
 import { auth } from "@/app/api/auth/[...nextauth]/route";
 import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
 
-export async function middleware(request: NextRequest) {
-  const session = await auth();
+export default auth((req) => {
+  const isLoggedIn = !!req.auth;
+  const isOnChat = req.nextUrl.pathname.startsWith("/chat");
 
-  // Protect /chat route
-  if (request.nextUrl.pathname.startsWith("/chat")) {
-    if (!session) {
-      return NextResponse.redirect(new URL("/api/auth/signin", request.url));
-    }
+  // Redirect unauthenticated users trying to access /chat
+  if (isOnChat && !isLoggedIn) {
+    return NextResponse.redirect(new URL("/api/auth/signin", req.url));
   }
 
   return NextResponse.next();
-}
+});
 
 export const config = {
   matcher: ["/chat/:path*"],
