@@ -1,5 +1,5 @@
 import express, { Request, Response } from "express";
-
+import { publisher, subscriber } from "./redis";
 import { createServer } from "http";
 import { Server } from "socket.io";
 
@@ -37,6 +37,17 @@ const io = new Server(httpServer, {
   },
 });
 
+const subscribedChannels = new Set<string>();
+
+subscriber.on("message", (channel, message) => {
+  try {
+    const data = JSON.parse(message);
+    io.to(data.roomId).emit(data.event, data.payload);
+  } catch (error) {
+    console.log("Redis message parse error", error);
+  }
+});
+
 // io.on() => Server level events
 // socket.on() => Client level events
 
@@ -57,11 +68,39 @@ io.on("connection", (socket) => {
     userData.rooms.add(roomId);
 
     socket.to(roomId).emit("user-joined", { userId, username, roomId });
+
+    //Subscribing to redis channel
+    const channel = `room:${roomId}`;
+    if (!subscribedChannels.has(channel)) {
+      subscriber.subscribe(channel);
+      subscribedChannels.add(channel);
+      console.log(`📡 Subscribed to Redis channel: ${channel}`);
+    }
+
+    // Publish join event to Redis
+    publisher.publish(
+      channel,
+      JSON.stringify({
+        event: "user-joined",
+        roomId,
+        payload: { userId, username, roomId },
+      })
+    );
     console.log(`${username} joined room ${roomId}`);
   });
 
   socket.on("send-message", (message: Message) => {
     io.to(message.roomId).emit("receive-message", message);
+
+    const channel = `room:${message.roomId}`;
+    publisher.publish(
+      channel,
+      JSON.stringify({
+        event: "receive-message",
+        roomId: message.roomId,
+        payload: message,
+      })
+    );
     console.log(
       `${message.username} sent message to ${message.roomId}: ${message.content}`
     );
@@ -69,6 +108,15 @@ io.on("connection", (socket) => {
 
   socket.on("typing", ({ roomId, username, isTyping }) => {
     socket.to(roomId).emit("user-typing", { roomId, username, isTyping });
+    const channel = `room:${roomId}`;
+    publisher.publish(
+      channel,
+      JSON.stringify({
+        event: "user-typing",
+        roomId,
+        payload: { username, isTyping, roomId },
+      })
+    );
   });
 
   socket.on("leave-room", ({ roomId, userId }) => {
@@ -77,6 +125,16 @@ io.on("connection", (socket) => {
 
     // Remove room from tracked rooms
     userData.rooms.delete(roomId);
+
+    const channel = `room:${roomId}`;
+    publisher.publish(
+      channel,
+      JSON.stringify({
+        event: "user-left",
+        roomId,
+        payload: { userId, username: userData.username, roomId },
+      })
+    );
 
     console.log(`${userId} left the room ${roomId}`);
   });
@@ -89,6 +147,19 @@ io.on("connection", (socket) => {
         username: userData.username,
         roomId,
       });
+      const channel = `room:${roomId}`;
+      publisher.publish(
+        channel,
+        JSON.stringify({
+          event: "user-disconnected",
+          roomId,
+          payload: {
+            userId: userData.userId,
+            username: userData.username,
+            roomId,
+          },
+        })
+      );
     });
 
     console.log(`${socket.id} (${userData.username}) Disconnected`);
