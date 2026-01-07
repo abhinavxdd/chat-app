@@ -187,7 +187,12 @@ io.on("connection", (socket) => {
   });
 });
 
-app.use(cors());
+app.use(
+  cors({
+    origin: CORS_ORIGIN,
+    credentials: true,
+  })
+);
 app.use(express.json());
 
 app.get("/", (req: Request, res: Response) => {
