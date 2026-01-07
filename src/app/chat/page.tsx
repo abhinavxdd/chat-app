@@ -50,6 +50,20 @@ export default function ChatPage() {
   useEffect(() => {
     if (!socket) return;
 
+    // Listen for message history (when joining room)
+    socket.on("message-history", (messages: any[]) => {
+      messages.forEach((msg: any) => {
+        addMessage({
+          id: msg.messageId,
+          userId: msg.userId,
+          username: msg.username,
+          content: msg.content,
+          timestamp: msg.timestamp,
+          roomId: msg.roomId,
+        });
+      });
+    });
+
     // Listen for new messages
     socket.on("receive-message", (message: any) => {
       addMessage({
@@ -87,6 +101,7 @@ export default function ChatPage() {
     });
 
     return () => {
+      socket.off("message-history");
       socket.off("receive-message");
       socket.off("user-joined");
       socket.off("user-left");

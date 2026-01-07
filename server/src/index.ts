@@ -2,11 +2,16 @@ import express, { Request, Response } from "express";
 import { publisher, subscriber } from "./redis";
 import { createServer } from "http";
 import { Server } from "socket.io";
+import { connectDB } from "./db";
+import { Message as MessageModel } from "./models/Message";
 
 import cors from "cors";
 
 import dotenv from "dotenv";
 dotenv.config();
+
+// Connect to MongoDB
+connectDB();
 
 interface UserData {
   userId: string;
@@ -60,7 +65,7 @@ io.on("connection", (socket) => {
     rooms: new Set<string>(),
   };
 
-  socket.on("join-room", ({ roomId, userId, username }) => {
+  socket.on("join-room", async ({ roomId, userId, username }) => {
     socket.join(roomId);
 
     userData.userId = userId;
@@ -75,6 +80,19 @@ io.on("connection", (socket) => {
       console.log(`📡 Subscribed to Redis channel: ${channel}`);
     }
 
+    // Load last 50 messages from MongoDB
+    try {
+      const messages = await MessageModel.find({ roomId })
+        .sort({ timestamp: -1 })
+        .limit(50)
+        .lean();
+
+      // Send messages in chronological order
+      socket.emit("message-history", messages.reverse());
+    } catch (error) {
+      console.error("Error loading messages:", error);
+    }
+
     // Publish join event to Redis
     publisher.publish(
       channel,
@@ -87,7 +105,21 @@ io.on("connection", (socket) => {
     console.log(`${username} joined room ${roomId}`);
   });
 
-  socket.on("send-message", (message: Message) => {
+  socket.on("send-message", async (message: Message) => {
+    // Save message to MongoDB
+    try {
+      await MessageModel.create({
+        messageId: message.id,
+        roomId: message.roomId,
+        userId: message.userId,
+        username: message.username,
+        content: message.content,
+        timestamp: message.timestamp,
+      });
+    } catch (error) {
+      console.error("Error saving message:", error);
+    }
+
     const channel = `room:${message.roomId}`;
     publisher.publish(
       channel,
