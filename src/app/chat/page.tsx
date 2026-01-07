@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import useSocket from "@/hooks/useSocket";
 import { useChatStore } from "@/store/chatStore";
 import ChatWindow from "@/components/chat/ChatWindow";
@@ -12,9 +13,9 @@ import toast, { Toaster } from "react-hot-toast";
 
 export default function ChatPage() {
   const router = useRouter();
+  const { data: session, status } = useSession();
   const { socket, connected } = useSocket();
   const [roomInput, setRoomInput] = useState("");
-  const [username, setUsername] = useState("");
   const [userId, setUserId] = useState("");
   const [hasJoined, setHasJoined] = useState(false);
 
@@ -31,17 +32,12 @@ export default function ChatPage() {
     clearMessages,
   } = useChatStore();
 
-  // Initialize user data
+  // Redirect if not authenticated
   useEffect(() => {
-    const storedUsername = localStorage.getItem("username");
-    if (!storedUsername) {
-      const randomUsername = `User${Math.floor(Math.random() * 10000)}`;
-      localStorage.setItem("username", randomUsername);
-      setUsername(randomUsername);
-    } else {
-      setUsername(storedUsername);
+    if (status === "unauthenticated") {
+      router.push("/api/auth/signin");
     }
-  }, []);
+  }, [status, router]);
 
   // Set userId when socket connects
   useEffect(() => {
@@ -101,7 +97,7 @@ export default function ChatPage() {
 
   // Join room function
   const handleJoinRoom = () => {
-    if (!socket || !roomInput.trim() || !username) {
+    if (!socket || !roomInput.trim() || !session?.user?.name) {
       toast.error("Please enter a room ID");
       return;
     }
@@ -109,7 +105,7 @@ export default function ChatPage() {
     socket.emit("join-room", {
       roomId: roomInput,
       userId: socket.id,
-      username,
+      username: session.user.name || "Anonymous",
     });
 
     setRoom(roomInput);
@@ -119,12 +115,12 @@ export default function ChatPage() {
 
   // Leave room function
   const handleLeaveRoom = () => {
-    if (!socket || !currentRoom) return;
+    if (!socket || !currentRoom || !session?.user?.name) return;
 
     socket.emit("leave-room", {
       roomId: currentRoom,
       userId: socket.id,
-      username,
+      username: session.user.name || "Anonymous",
     });
 
     clearMessages();
@@ -137,12 +133,13 @@ export default function ChatPage() {
   // Send message function
   const handleSendMessage = useCallback(
     (content: string) => {
-      if (!socket || !currentRoom || !content.trim()) return;
+      if (!socket || !currentRoom || !content.trim() || !session?.user?.name)
+        return;
 
       const message = {
         id: `${Date.now()}-${Math.random()}`,
         userId: socket.id || "",
-        username,
+        username: session.user?.name || "Anonymous",
         content: content.trim(),
         timestamp: Date.now(),
         roomId: currentRoom,
@@ -150,17 +147,17 @@ export default function ChatPage() {
 
       socket.emit("send-message", message);
     },
-    [socket, currentRoom, username]
+    [socket, currentRoom, session?.user?.name]
   );
 
   // Typing indicator
   let typingTimeout: NodeJS.Timeout;
   const handleTyping = useCallback(() => {
-    if (!socket || !currentRoom) return;
+    if (!socket || !currentRoom || !session?.user?.name) return;
 
     socket.emit("typing", {
       roomId: currentRoom,
-      username,
+      username: session.user?.name || "Anonymous",
       isTyping: true,
     });
 
@@ -168,11 +165,25 @@ export default function ChatPage() {
     typingTimeout = setTimeout(() => {
       socket.emit("typing", {
         roomId: currentRoom,
-        username,
+        username: session.user?.name || "Anonymous",
         isTyping: false,
       });
     }, 1000);
-  }, [socket, currentRoom, username]);
+  }, [socket, currentRoom, session?.user?.name]);
+
+  // Show loading while checking auth
+  if (status === "loading") {
+    return (
+      <div className="h-screen flex items-center justify-center bg-black">
+        <div className="text-white text-xl">Loading...</div>
+      </div>
+    );
+  }
+
+  // Don't render if not authenticated
+  if (!session) {
+    return null;
+  }
 
   return (
     <div className="h-screen flex flex-col bg-black">
@@ -194,7 +205,7 @@ export default function ChatPage() {
           </div>
 
           <div className="flex items-center gap-4">
-            <span className="text-gray-400 text-sm">{username}</span>
+            <span className="text-gray-400 text-sm">{session.user?.name}</span>
             <div className="flex items-center gap-2">
               <div
                 className={`w-2 h-2 rounded-full ${
