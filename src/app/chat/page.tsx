@@ -10,6 +10,7 @@ import MessageInput from "@/components/chat/MessageInput";
 import UserList from "@/components/chat/UserList";
 import { LogOut, Hash } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
+import { perfMonitor } from "@/utils/performanceMonitor";
 
 export default function ChatPage() {
   const router = useRouter();
@@ -31,6 +32,13 @@ export default function ChatPage() {
     setTyping,
     clearMessages,
   } = useChatStore();
+
+  // Expose perfMonitor to window for console access
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      (window as any).perfMonitor = perfMonitor;
+    }
+  }, []);
 
   // Redirect if not authenticated
   useEffect(() => {

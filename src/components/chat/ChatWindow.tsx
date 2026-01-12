@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import MessageBubble from "./MessageBubble";
 import { MessageCircle } from "lucide-react";
+import { useRenderCount } from "@/hooks/useRenderCount";
 
 interface Message {
   id: string;
@@ -25,6 +26,9 @@ export default function ChatWindow({
   currentRoom,
 }: ChatWindowProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Track component re-renders (log every 5 renders)
+  useRenderCount("ChatWindow", 5);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });

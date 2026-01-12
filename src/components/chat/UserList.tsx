@@ -1,6 +1,7 @@
 "use client";
 
 import { Users, Loader2 } from "lucide-react";
+import { useRenderCount } from "@/hooks/useRenderCount";
 
 interface User {
   userId: string;
@@ -24,6 +25,9 @@ export default function UserList({
   currentUserId,
 }: UserListProps) {
   const activeTypingUsers = typingUsers.filter((u) => u.isTyping);
+
+  // Track re-renders
+  useRenderCount("UserList", 5);
 
   return (
     <div className="w-64 bg-gray-950 border-l border-gray-800 flex flex-col">

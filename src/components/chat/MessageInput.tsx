@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Send } from "lucide-react";
+import { useRenderCount } from "@/hooks/useRenderCount";
 
 interface MessageInputProps {
   onSendMessage: (message: string) => void;
@@ -15,6 +16,9 @@ export default function MessageInput({
   disabled,
 }: MessageInputProps) {
   const [message, setMessage] = useState("");
+
+  // Track re-renders
+  useRenderCount("MessageInput", 5);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

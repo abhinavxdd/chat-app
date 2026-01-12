@@ -4,6 +4,7 @@ import { createServer } from "http";
 import { Server } from "socket.io";
 import { connectDB } from "./db";
 import { Message as MessageModel } from "./models/Message";
+import { cacheMetrics } from "./cacheMetrics";
 
 import cors from "cors";
 
@@ -80,12 +81,39 @@ io.on("connection", (socket) => {
       console.log(`📡 Subscribed to Redis channel: ${channel}`);
     }
 
-    // Load last 50 messages from MongoDB
+    // Load last 50 messages - try cache first, then MongoDB
     try {
-      const messages = await MessageModel.find({ roomId })
-        .sort({ timestamp: -1 })
-        .limit(50)
-        .lean();
+      const cacheKey = `messages:${roomId}:latest`;
+      const startTime = Date.now();
+
+      // Try to get from Redis cache
+      const cachedMessages = await publisher.get(cacheKey);
+
+      let messages;
+      if (cachedMessages) {
+        // Cache HIT
+        cacheMetrics.recordHit();
+        messages = JSON.parse(cachedMessages);
+        console.log(
+          `✅ Cache HIT for room ${roomId} (${Date.now() - startTime}ms)`
+        );
+      } else {
+        // Cache MISS - fetch from MongoDB
+        cacheMetrics.recordMiss();
+        const dbStartTime = Date.now();
+        messages = await MessageModel.find({ roomId })
+          .sort({ timestamp: -1 })
+          .limit(50)
+          .lean();
+
+        const dbTime = Date.now() - dbStartTime;
+        console.log(
+          `❌ Cache MISS for room ${roomId} - MongoDB query (${dbTime}ms)`
+        );
+
+        // Store in cache for 5 minutes
+        await publisher.setex(cacheKey, 300, JSON.stringify(messages));
+      }
 
       // Send messages in chronological order
       socket.emit("message-history", messages.reverse());
@@ -116,6 +144,10 @@ io.on("connection", (socket) => {
         content: message.content,
         timestamp: message.timestamp,
       });
+
+      // Invalidate cache for this room
+      const cacheKey = `messages:${message.roomId}:latest`;
+      await publisher.del(cacheKey);
     } catch (error) {
       console.error("Error saving message:", error);
     }
@@ -197,6 +229,11 @@ app.use(express.json());
 
 app.get("/", (req: Request, res: Response) => {
   res.send("API is running");
+});
+
+app.get("/metrics/cache", (req: Request, res: Response) => {
+  const stats = cacheMetrics.getStats();
+  res.json(stats);
 });
 
 httpServer.listen(PORT, () => {
