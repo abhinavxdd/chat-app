@@ -95,7 +95,7 @@ io.on("connection", (socket) => {
         cacheMetrics.recordHit();
         messages = JSON.parse(cachedMessages);
         console.log(
-          `✅ Cache HIT for room ${roomId} (${Date.now() - startTime}ms)`
+          `✅ Cache HIT for room ${roomId} (${Date.now() - startTime}ms)`,
         );
       } else {
         // Cache MISS - fetch from MongoDB
@@ -108,7 +108,7 @@ io.on("connection", (socket) => {
 
         const dbTime = Date.now() - dbStartTime;
         console.log(
-          `❌ Cache MISS for room ${roomId} - MongoDB query (${dbTime}ms)`
+          `❌ Cache MISS for room ${roomId} - MongoDB query (${dbTime}ms)`,
         );
 
         // Store in cache for 5 minutes
@@ -128,7 +128,7 @@ io.on("connection", (socket) => {
         event: "user-joined",
         roomId,
         payload: { userId, username, roomId },
-      })
+      }),
     );
     console.log(`${username} joined room ${roomId}`);
   });
@@ -159,10 +159,10 @@ io.on("connection", (socket) => {
         event: "receive-message",
         roomId: message.roomId,
         payload: message,
-      })
+      }),
     );
     console.log(
-      `${message.username} sent message to ${message.roomId}: ${message.content}`
+      `${message.username} sent message to ${message.roomId}: ${message.content}`,
     );
   });
 
@@ -174,7 +174,7 @@ io.on("connection", (socket) => {
         event: "user-typing",
         roomId,
         payload: { username, isTyping, roomId },
-      })
+      }),
     );
   });
 
@@ -191,7 +191,7 @@ io.on("connection", (socket) => {
         event: "user-left",
         roomId,
         payload: { userId, username: userData.username, roomId },
-      })
+      }),
     );
 
     console.log(`${userId} left the room ${roomId}`);
@@ -211,7 +211,7 @@ io.on("connection", (socket) => {
             username: userData.username,
             roomId,
           },
-        })
+        }),
       );
     });
 
@@ -223,7 +223,7 @@ app.use(
   cors({
     origin: CORS_ORIGIN,
     credentials: true,
-  })
+  }),
 );
 app.use(express.json());
 
@@ -234,6 +234,24 @@ app.get("/", (req: Request, res: Response) => {
 app.get("/metrics/cache", (req: Request, res: Response) => {
   const stats = cacheMetrics.getStats();
   res.json(stats);
+});
+
+// Redis health check endpoint to keep Upstash active
+app.get("/health/redis", async (req: Request, res: Response) => {
+  try {
+    await publisher.ping();
+    res.json({
+      status: "ok",
+      redis: "connected",
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: "error",
+      redis: "disconnected",
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
+  }
 });
 
 httpServer.listen(PORT, () => {
