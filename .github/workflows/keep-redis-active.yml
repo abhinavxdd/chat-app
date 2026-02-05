@@ -1,0 +1,24 @@
+name: Keep Redis Active
+
+on:
+  schedule:
+    # Runs every day at 12:00 PM UTC (adjust timezone as needed)
+    - cron: "0 12 * * *"
+  workflow_dispatch: # Allows manual triggering
+
+jobs:
+  ping-redis:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Ping Redis endpoint
+        run: |
+          echo "Pinging Redis health endpoint..."
+          response=$(curl -s -o /dev/null -w "%{http_code}" ${{ secrets.SERVER_URL }}/health/redis)
+
+          if [ $response -eq 200 ]; then
+            echo "✅ Redis is active and healthy (HTTP $response)"
+          else
+            echo "⚠️ Redis health check returned HTTP $response"
+            exit 1
+          fi
